@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 
 try:
@@ -13,7 +15,7 @@ import asyncio
 import datetime
 
 from async_lru import alru_cache  # type: ignore
-from functools import lru_cache, wraps, cache
+from functools import lru_cache, wraps
 from datetime import timedelta
 import discord
 from discord import app_commands
