@@ -31,15 +31,22 @@ from discord.ext import commands
 from discord.ext.commands import has_permissions, MissingPermissions
 from time import sleep
 
-config = {
-    "сервер кураторки": 1137004117647171614,  # id сервера кураторки
-    "сообщение с реакцией": 1137019048077557781,  # id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки
-    "канал оповещений": 1137016771455488060,  # id канала, в которое бот будет срать оповещениями
-    "сервер ХГ": 612339223294640128,  # id сервера HG
-    "роль ожидание кураторки": 1137020285405630517,
-    "роль верефицирован": 1137018790035599501,
-    "роль участник": 612341683014598656,
-}
+
+class config:
+    server_kuratorka = (1137004117647171614,)  # id сервера кураторки
+    message_reacting = (
+        1137019048077557781,
+    )  # id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки
+    channel_alert = (
+        1137016771455488060,
+    )  # id канала, в которое бот будет срать оповещениями
+    server_HG = (612339223294640128,)  # id сервера HG
+    role_wait_kurator = (1137020285405630517,)  # роль ожидание кураторки
+    role_vereficate = (1137018790035599501,)  # роль верефицирован
+    role_participant = (612341683014598656,)  # роль участник
+
+    def __init__(self) -> None:
+        pass
 
 
 discord_token = os.environ["inviteHG_discord_token"]
@@ -79,15 +86,15 @@ async def on_ready():
 
 @client.event
 async def on_member_join(member: discord.Member):
-    if member.guild.id == config["сервер ХГ"] and config["роль верефицирован"] in [
+    if member.guild.id == config.server_HG and config.role_vereficate in [
         role.id
-        for role in get_guild(config["сервер кураторки"]).get_member(member.id).roles
+        for role in get_guild(config.server_kuratorka).get_member(member.id).roles
     ]:
         member.add_roles(
-            get_role(config["сервер ХГ"], config["роль участник"]),
+            get_role(config.server_HG, config.role_participant),
             reason="Bерефицирован в кураторке",
         )
-        get_guild(config["сервер кураторки"]).kick(
+        get_guild(config.server_kuratorka).kick(
             member, reason="Прошел кураторку и зашел на сервер ХГ"
         )
         return
