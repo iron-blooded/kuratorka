@@ -33,17 +33,15 @@ from time import sleep
 
 
 class config:
-    server_kuratorka = (1137004117647171614,)  # id сервера кураторки
-    message_reacting = (
-        1137019048077557781,
-    )  # id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки
+    server_kuratorka = 1137004117647171614  # id сервера кураторки
+    message_reacting = 1137019048077557781  # id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки
     channel_alert = (
-        1137016771455488060,
-    )  # id канала, в которое бот будет срать оповещениями
-    server_HG = (612339223294640128,)  # id сервера HG
-    role_wait_kurator = (1137020285405630517,)  # роль ожидание кураторки
-    role_vereficate = (1137018790035599501,)  # роль верефицирован
-    role_participant = (612341683014598656,)  # роль участник
+        1137016771455488060  # id канала, в которое бот будет срать оповещениями
+    )
+    server_HG = 612339223294640128  # id сервера HG
+    role_wait_kurator = 1137020285405630517  # роль ожидание кураторки
+    role_vereficate = 1137018790035599501  # роль верефицирован
+    role_participant = 612341683014598656  # роль участник
 
     def __init__(self) -> None:
         pass
@@ -89,14 +87,69 @@ async def on_member_join(member: discord.Member):
     if member.guild.id == config.server_HG and config.role_vereficate in [
         role.id
         for role in get_guild(config.server_kuratorka).get_member(member.id).roles
-    ]:
-        member.add_roles(
+    ]:  # если чел заходит на ХГ, и он верефицирован
+        await member.add_roles(
             get_role(config.server_HG, config.role_participant),
             reason="Bерефицирован в кураторке",
         )
-        get_guild(config.server_kuratorka).kick(
+        await get_guild(config.server_kuratorka).kick(
             member, reason="Прошел кураторку и зашел на сервер ХГ"
         )
+        return
+
+
+@client.event
+async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    user = discord.utils.get(client.get_all_members(), id=payload.user_id)
+    if user.id == client.user.id:
+        return
+    emoji = payload.emoji
+    if (
+        payload.message_id == config.message_reacting
+    ):  # если реакцию поставили под сообщение с запросом кураторки
+        await user.add_roles(
+            get_role(config.server_kuratorka, config.role_wait_kurator),
+            reason="Запросил кураторку",
+        )
+        message_reacted = await client.get_channel(payload.channel_id).fetch_message(
+            payload.message_id
+        )
+        await message_reacted.remove_reaction(payload.emoji, user)
+        channel = client.get_channel(config.channel_alert)
+        message = await channel.send(
+            f"""@here <@{user.id}> желает пройти кураторку!\nЕсли игрок прошел кураторку, ставьте галочку, но если он на 24% умнее собаки - крестик.""",
+            tts=True,
+        )
+        await message.add_reaction("✅")
+        await message.add_reaction("❌")
+        return
+    if (
+        payload.channel_id == config.channel_alert
+    ):  # если канал - канал с алертами кураторов
+        message_reacted = await client.get_channel(payload.channel_id).fetch_message(
+            payload.message_id
+        )
+        user_wait_kuratorka = None
+        for user_reacted in message_reacted.mentions:
+            user_wait_kuratorka = user_reacted
+        if emoji.name == "✅":
+            await message_reacted.edit(
+                content=f"✅ Пользователь <@{user_wait_kuratorka.id}> успешно прошел кураторку.\nПодтвердил: <@{user.id}>"
+            )
+            await user_wait_kuratorka.remove_roles(
+                get_role(config.server_kuratorka, config.role_wait_kurator),
+                reason="Прошел кураторку",
+            )
+            await user_wait_kuratorka.add_roles(
+                get_role(config.server_kuratorka, config.role_vereficate),
+                reason="Прошел кураторку",
+            )
+        else:
+            await message_reacted.edit(
+                content=f"❌ <@{user_wait_kuratorka.id}> сообщил что в курсе, как работает этот станок 1939 года выпуска.\nПодтвердил: <@{user.id}>"
+            )
+            await user_wait_kuratorka.ban(reason=f"Претензии к прохождению кураторки от {user.id}.")
+        await message_reacted.clear_reactions()
         return
 
 
