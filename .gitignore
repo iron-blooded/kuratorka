@@ -1,0 +1,14 @@
+__pycache__/num2t4ru.cpython-310.pyc
+__pycache__/ping.cpython-310.pyc
+__pycache__/
+venv/
+node_modules
+.replit
+.breakpoints
+package-lock.json
+package.json
+poetry.lock
+pyproject.toml
+repl.deploy
+replit-deploy.json
+replit.nix
