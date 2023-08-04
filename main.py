@@ -10,18 +10,8 @@ except Exception as e:
 
 
 import asyncio
-import json
 import datetime
-import re
-import io, copy
 
-# import pysftp
-import paramiko  # type: ignore
-import threading
-import logging
-import time
-import random
-import pymorphy2  # type: ignore
 from async_lru import alru_cache  # type: ignore
 from functools import lru_cache, wraps, cache
 from datetime import timedelta
@@ -30,6 +20,7 @@ from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import has_permissions, MissingPermissions
 from time import sleep
+import youtube_dl
 
 
 class config:
@@ -148,9 +139,66 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             await message_reacted.edit(
                 content=f"❌ <@{user_wait_kuratorka.id}> сообщил что в курсе, как работает этот станок 1939 года выпуска.\nПодтвердил: <@{user.id}>"
             )
-            await user_wait_kuratorka.ban(reason=f"Претензии к прохождению кураторки от {user.id}.")
+            await user_wait_kuratorka.ban(
+                reason=f"Претензии к прохождению кураторки от {user.id}."
+            )
         await message_reacted.clear_reactions()
         return
+
+
+def get_audio_source(url):
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192',
+        }],
+    }
+
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        url2 = info['formats'][0]['url']
+
+    return discord.FFmpegPCMAudio(url2)
+
+@client.event
+async def play_music(voice_channel, video_url):
+    if not voice_channel:
+        print('Голосовой канал не найден.')
+        return
+
+    voice_client = await voice_channel.connect()
+
+    try:
+        audio_source = get_audio_source(video_url)
+        voice_client.play(audio_source)
+        while voice_client.is_playing():
+            await asyncio.sleep(1)
+        await voice_client.disconnect()
+    except Exception as e:
+        print(f'Произошла ошибка при проигрывании музыки: {e}')
+        await voice_client.disconnect()
+
+
+@client.event
+async def on_voice_state_update(
+    member: discord.Member, before: discord.VoiceChannel, after: discord.VoiceChannel
+):
+    if member.bot:
+        return
+    if before.channel != after.channel:
+        voice_channel = after.channel
+        if client.voice_clients:
+            for voice_client in client.voice_clients:
+                if voice_client.guild == member.guild:
+                    # Если бот уже в голосовом канале на этом сервере, выходим из него
+                    await voice_client.disconnect()
+        if voice_channel is not None and not client.voice_clients:
+            try:
+                await play_music(voice_channel, "https://www.youtube.com/watch?v=s5DV9cSabjQ")
+            except discord.errors.ClientException:
+                print("Бот уже находится в голосовом канале.")
 
 
 @timed_lru_cache(300)

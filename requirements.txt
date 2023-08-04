@@ -1,3 +1,5 @@
 flask
-threading
-random
+asyncio
+datetime
+async_lru
+discord
