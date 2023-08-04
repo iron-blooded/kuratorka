@@ -49,7 +49,6 @@ intents.reactions = True
 client = discord.Client(
     intents=intents,
 )
-tree_commands = app_commands.CommandTree(client)
 
 
 def timed_lru_cache(seconds: int, maxsize: int = 128):
@@ -72,7 +71,6 @@ def timed_lru_cache(seconds: int, maxsize: int = 128):
 
 @client.event
 async def on_ready():
-    await tree_commands.sync(guild=discord.Object(id=guild_id))
     await client.wait_until_ready()
     print("Бот запущен!")
     while not client.is_closed():
