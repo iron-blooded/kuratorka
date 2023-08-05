@@ -161,7 +161,7 @@ async def play_music(voice_channel: discord.VoiceChannel):
         while voice_client.is_connected:
             music = get_files_in_directory("music")
             random.shuffle(music)
-            await voice_client.play(discord.FFmpegPCMAudio("music/"+music[-1]), after=lambda e: print('Музыка закончилась'))
+            await voice_client.play(discord.FFmpegPCMAudio("music/"+music[-1]), after=lambda e: await voice_client.disconnect())
     except Exception as e:
         print(e)
     # await voice_client.disconnect()
