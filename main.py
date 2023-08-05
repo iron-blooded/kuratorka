@@ -210,7 +210,7 @@ async def play_music(voice_channel: discord.VoiceChannel):
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
-    if member.bot or (member.guild.id == config.server_HG and not (after.channel == None or max([name in after.channel.name for name in ["Основа", "Кураторка"]]))):
+    if member.bot or (member.guild.id == config.server_HG): #and not (after.channel == None or max([name in after.channel.name for name in ["Основа", "Кураторка"]]))):
         return
     if before.channel != after.channel:
         voice_channel = after.channel
