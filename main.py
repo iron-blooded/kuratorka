@@ -26,12 +26,12 @@ from time import sleep
 
 
 class config:
-    server_kuratorka = 1137004117647171614 
-    '''id сервера кураторки'''
+    server_kuratorka = 1137004117647171614
+    """id сервера кураторки"""
     message_reacting = 1137019048077557781
-    '''id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки'''
+    """id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки"""
     channel_alert = 1137016771455488060
-    '''id канала, в которое бот будет срать оповещениями'''
+    """id канала, в которое бот будет срать оповещениями"""
     server_HG = 612339223294640128
     """id сервера HG"""
     role_wait_kurator = 1137020285405630517
@@ -39,11 +39,13 @@ class config:
     role_vereficate = 1137018790035599501
     """роль верефицирован"""
     role_participant = 612341683014598656
-    """роль участник"""
+    """роль участник на ХГ"""
+    role_unvereficate = 1050035683848364064
+    """роль неверефицирован на ХГ"""
     channel_writing_anketa = 1137358502239682712
     """канал с написанием анкет"""
     role_curator = 1137018745567584326
-    """куратор"""
+    """роль куратор"""
 
     def __init__(self) -> None:
         pass
@@ -92,6 +94,10 @@ async def on_member_join(member: discord.Member):
     ]:  # если чел заходит на ХГ, и он верефицирован
         await member.add_roles(
             get_role(config.server_HG, config.role_participant),
+            reason="Bерефицирован в кураторке",
+        )
+        await member.remove_roles(
+            get_role(config.server_HG, config.role_unvereficate),
             reason="Bерефицирован в кураторке",
         )
         await get_guild(config.server_kuratorka).kick(
@@ -198,7 +204,9 @@ async def play_music(voice_channel: discord.VoiceChannel):
             music = get_files_in_directory("music")
             random.shuffle(music)
             await voice_client.play(
-                discord.PCMVolumeTransformer(discord.FFmpegPCMAudio("music/" + music[-1]), volume=0.1),
+                discord.PCMVolumeTransformer(
+                    discord.FFmpegPCMAudio("music/" + music[-1]), volume=0.1
+                ),
                 after=lambda e: voice_client.disconnect(),
             )
     except Exception as e:
@@ -210,15 +218,17 @@ async def play_music(voice_channel: discord.VoiceChannel):
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
-    if member.bot or (member.guild.id == config.server_HG): #and not (after.channel == None or max([name in after.channel.name for name in ["Основа", "Кураторка"]]))):
+    if member.bot or (
+        member.guild.id == config.server_HG
+    ):  # and not (after.channel == None or max([name in after.channel.name for name in ["Основа", "Кураторка"]]))):
         return
     if before.channel != after.channel:
         voice_channel = after.channel
         if client.voice_clients:
             for voice_client in client.voice_clients:
                 if voice_client.guild == member.guild:
-                    if (voice_client.channel == before.channel):
-                    # Если бот уже в голосовом канале на этом сервере, выходим из него
+                    if voice_client.channel == before.channel:
+                        # Если бот уже в голосовом канале на этом сервере, выходим из него
                         await voice_client.disconnect()
         if voice_channel is not None and not client.voice_clients:
             count = 0
