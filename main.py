@@ -217,8 +217,9 @@ async def on_voice_state_update(
         if client.voice_clients:
             for voice_client in client.voice_clients:
                 if voice_client.guild == member.guild:
+                    if (voice_client.channel == before.channel):
                     # Если бот уже в голосовом канале на этом сервере, выходим из него
-                    await voice_client.disconnect()
+                        await voice_client.disconnect()
         if voice_channel is not None and not client.voice_clients:
             count = 0
             for user in after.channel.members:
