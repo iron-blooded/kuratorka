@@ -133,7 +133,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         await message_reacted.remove_reaction(payload.emoji, user)
         channel = client.get_channel(config.channel_alert)
         message = await channel.send(
-            f"""@here <@{user.id}> желает пройти кураторку!\nЕсли игрок прошел кураторку, ставьте галочку, но если он на 24% умнее собаки - крестик.""",
+            f"""@here <@&{config.role_curator}> <@{user.id}> желает пройти кураторку!\nЕсли игрок прошел кураторку, ставьте галочку, но если он всего лишь на 24% умнее собаки - крестик.""",
             tts=True,
         )
         await message.add_reaction("✅")
@@ -169,7 +169,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     if (
         payload.channel_id == config.channel_writing_anketa
     ):  # если канал - канал с анкетами
-        if config.role_curator not in [i.id for i in user.roles]:
+        if not user.roles or config.role_curator not in [i.id for i in user.roles]:
             await message_reacted.remove_reaction(payload.emoji, user)
             return
         if emoji.name == "✅":
@@ -218,9 +218,7 @@ async def play_music(voice_channel: discord.VoiceChannel):
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
-    if member.bot or (
-        member.guild.id == config.server_HG
-    ):  # and not (after.channel == None or max([name in after.channel.name for name in ["Основа", "Кураторка"]]))):
+    if member.bot or member.guild.id == config.server_HG:
         return
     if before.channel != after.channel:
         voice_channel = after.channel
@@ -229,19 +227,19 @@ async def on_voice_state_update(
                 if voice_client.guild == member.guild:
                     if voice_client.channel == before.channel:
                         # Если бот уже в голосовом канале на этом сервере, выходим из него
-                        await voice_client.disconnect()
-        if voice_channel is not None and not client.voice_clients:
+                        return await voice_client.disconnect()
+        if voice_channel is not None:
             count = 0
             for user in after.channel.members:
                 if not user.bot:
                     count += 1
             if count <= 1:
                 try:
-                    await play_music(voice_channel)
+                    return await play_music(voice_channel)
                 except discord.errors.ClientException:
                     print("Бот уже находится в голосовом канале.")
             else:
-                await voice_client.disconnect()
+                return await voice_client.disconnect()
 
 
 @timed_lru_cache(300)
