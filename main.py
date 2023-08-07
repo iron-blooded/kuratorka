@@ -161,8 +161,9 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             await message_reacted.edit(
                 content=f"❌ <@{user_wait_kuratorka.id}> сообщил что в курсе, как работает этот станок 1939 года выпуска.\nПодтвердил: <@{user.id}>"
             )
-            await user_wait_kuratorka.ban(
-                reason=f"Претензии к прохождению кураторки от {user.id}."
+            get_guild(config.server_kuratorka).ban(
+                user_wait_kuratorka,
+                reason=f"Претензии к прохождению кураторки от {user.id}.",
             )
         await message_reacted.clear_reactions()
         return
