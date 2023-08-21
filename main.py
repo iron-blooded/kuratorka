@@ -79,6 +79,7 @@ def timed_lru_cache(seconds: int, maxsize: int = 128):
 
 
 async def vereficate_and_kick(member: discord.Member):
+    member = get_guild(config.server_HG).get_member(member.id)
     await member.add_roles(
         get_role(config.server_HG, config.role_participant),
         reason="Bерефицирован в кураторке",
@@ -107,7 +108,7 @@ async def on_member_join(member: discord.Member):
         role.id
         for role in get_guild(config.server_kuratorka).get_member(member.id).roles
     ]:  # если чел заходит на ХГ, и он верефицирован
-        await asyncio.sleep(60 * 2)
+        await asyncio.sleep(2)
         return await vereficate_and_kick(member)
 
 
@@ -138,7 +139,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         await message_reacted.remove_reaction(payload.emoji, user)
         channel = client.get_channel(config.channel_alert)
         message = await channel.send(
-            f"""@here <@&{config.role_curator}> <@{user.id}> желает пройти кураторку!\nЕсли игрок прошел кураторку, ставьте галочку, но если он всего лишь на 24% умнее собаки - крестик.""",
+            (f"""@here <@&{config.role_curator}>""" if user.id != 1129473387220176968 else "") + f"""<@{user.id}> желает пройти кураторку!\nЕсли игрок прошел кураторку, ставьте галочку, но если он всего лишь на 24% умнее собаки - крестик.""",
             tts=True,
         )
         await message.add_reaction("✅")
@@ -154,7 +155,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             await message_reacted.edit(
                 content=f"✅ Пользователь <@{user_wait_kuratorka.id}> успешно прошел кураторку.\nПодтвердил: <@{user.id}>"
             )
-            if get_guild(config.server_kuratorka).get_member(user_wait_kuratorka.id):
+            if get_guild(config.server_HG).get_member(user_wait_kuratorka.id):
                 await vereficate_and_kick(user_wait_kuratorka)
             else:
                 await user_wait_kuratorka.remove_roles(
