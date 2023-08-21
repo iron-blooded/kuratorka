@@ -78,6 +78,21 @@ def timed_lru_cache(seconds: int, maxsize: int = 128):
     return wrapper_cache
 
 
+async def vereficate_and_kick(member: discord.Member):
+    await member.add_roles(
+        get_role(config.server_HG, config.role_participant),
+        reason="Bерефицирован в кураторке",
+    )
+    await member.remove_roles(
+        get_role(config.server_HG, config.role_unvereficate),
+        reason="Bерефицирован в кураторке",
+    )
+    await get_guild(config.server_kuratorka).kick(
+        member, reason="Прошел кураторку и зашел на сервер ХГ"
+    )
+    return
+
+
 @client.event
 async def on_ready():
     await client.wait_until_ready()
@@ -92,18 +107,8 @@ async def on_member_join(member: discord.Member):
         role.id
         for role in get_guild(config.server_kuratorka).get_member(member.id).roles
     ]:  # если чел заходит на ХГ, и он верефицирован
-        await member.add_roles(
-            get_role(config.server_HG, config.role_participant),
-            reason="Bерефицирован в кураторке",
-        )
-        await member.remove_roles(
-            get_role(config.server_HG, config.role_unvereficate),
-            reason="Bерефицирован в кураторке",
-        )
-        await get_guild(config.server_kuratorka).kick(
-            member, reason="Прошел кураторку и зашел на сервер ХГ"
-        )
-        return
+        await asyncio.sleep(60 * 2)
+        return await vereficate_and_kick(member)
 
 
 @client.event
@@ -149,14 +154,17 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             await message_reacted.edit(
                 content=f"✅ Пользователь <@{user_wait_kuratorka.id}> успешно прошел кураторку.\nПодтвердил: <@{user.id}>"
             )
-            await user_wait_kuratorka.remove_roles(
-                get_role(config.server_kuratorka, config.role_wait_kurator),
-                reason="Прошел кураторку",
-            )
-            await user_wait_kuratorka.add_roles(
-                get_role(config.server_kuratorka, config.role_vereficate),
-                reason="Прошел кураторку",
-            )
+            if get_guild(config.server_kuratorka).get_member(user_wait_kuratorka.id):
+                await vereficate_and_kick(user_wait_kuratorka)
+            else:
+                await user_wait_kuratorka.remove_roles(
+                    get_role(config.server_kuratorka, config.role_wait_kurator),
+                    reason="Прошел кураторку",
+                )
+                await user_wait_kuratorka.add_roles(
+                    get_role(config.server_kuratorka, config.role_vereficate),
+                    reason="Прошел кураторку",
+                )
         else:
             await message_reacted.edit(
                 content=f"❌ <@{user_wait_kuratorka.id}> сообщил что в курсе, как работает этот станок 1939 года выпуска.\nПодтвердил: <@{user.id}>"
