@@ -228,8 +228,6 @@ async def play_music(voice_channel: discord.VoiceChannel):
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
-    if member.bot or member.guild.id == config.server_HG:
-        return
     if before.channel != after.channel:
         voice_channel = after.channel
         if client.voice_clients:
@@ -237,7 +235,7 @@ async def on_voice_state_update(
                 if voice_client.guild == member.guild:
                     if voice_client.channel == before.channel:
                         # Если бот уже в голосовом канале на этом сервере, выходим из него
-                        return await voice_client.disconnect()
+                        await voice_client.disconnect()
         if voice_channel is not None:
             count = 0
             for user in after.channel.members:
@@ -245,7 +243,8 @@ async def on_voice_state_update(
                     count += 1
             if count <= 1:
                 try:
-                    return await play_music(voice_channel)
+                    if member.guild.id != config.server_HG or "Основа" in voice_channel.name or "Кураторка" in voice_channel.name:
+                        return await play_music(voice_channel)
                 except discord.errors.ClientException:
                     print("Бот уже находится в голосовом канале.")
             else:
