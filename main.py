@@ -259,7 +259,7 @@ async def on_voice_state_update(
                     ):
                         return await play_music(voice_channel, False)
                 except discord.errors.ClientException as e:
-                    print("Бот уже находится в голосовом канале: " + e)
+                    print(f"Бот уже находится в голосовом канале: {e}")
             # else:
             # return await voice_client.disconnect()
 
