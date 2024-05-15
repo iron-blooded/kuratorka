@@ -3,3 +3,4 @@ asyncio
 datetime
 async_lru
 discord
+PyNaCl

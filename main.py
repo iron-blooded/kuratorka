@@ -2,14 +2,6 @@
 
 import os
 
-try:
-    if os.environ["its_host"]:
-        from gigs import живем
-
-        живем()
-except Exception as e:
-    print(e)
-
 
 import asyncio
 import datetime
@@ -26,25 +18,25 @@ from time import sleep
 
 
 class config:
-    server_kuratorka = 1137004117647171614
+    server_kuratorka = 1217209541197041714
     """id сервера кураторки"""
-    message_reacting = 1137019048077557781
+    message_reacting = 1217209789646377142
     """id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки"""
-    channel_alert = 1137016771455488060
+    channel_alert = 1217209541708611659
     """id канала, в которое бот будет срать оповещениями"""
     server_HG = 612339223294640128
     """id сервера HG"""
-    role_wait_kurator = 1137020285405630517
+    role_wait_kurator = 1217209541197041715
     """роль ожидание кураторки"""
-    role_vereficate = 1137018790035599501
+    role_vereficate = 1217209541197041716
     """роль верефицирован"""
     role_participant = 612341683014598656
     """роль участник на ХГ"""
     role_unvereficate = 1050035683848364064
     """роль неверефицирован на ХГ"""
-    channel_writing_anketa = 1137358502239682712
+    channel_writing_anketa = 1217209541708611661
     """канал с написанием анкет"""
-    role_curator = 1137018745567584326
+    role_curator = 1217209541197041717
     """роль куратор"""
 
     def __init__(self) -> None:
@@ -58,7 +50,7 @@ intents.reactions = True
 client = discord.Client(
     intents=intents,
 )
-
+tree_commands = app_commands.CommandTree(client)
 
 def timed_lru_cache(seconds: int, maxsize: int = 128):
     def wrapper_cache(func):
@@ -96,6 +88,7 @@ async def vereficate_and_kick(member: discord.Member):
 
 @client.event
 async def on_ready():
+    await tree_commands.sync()
     await client.wait_until_ready()
     print("Бот запущен!")
     while not client.is_closed():
@@ -139,7 +132,12 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         await message_reacted.remove_reaction(payload.emoji, user)
         channel = client.get_channel(config.channel_alert)
         message = await channel.send(
-            (f"""@here <@&{config.role_curator}>""" if user.id != 1129473387220176968 else "") + f"""<@{user.id}> желает пройти кураторку!\nЕсли игрок прошел кураторку, ставьте галочку, но если он всего лишь на 24% умнее собаки - крестик.""",
+            (
+                f"""@here <@&{config.role_curator}>"""
+                if user.id != 1129473387220176968
+                else ""
+            )
+            + f"""<@{user.id}> желает пройти кураторку!\nЕсли игрок прошел кураторку, ставьте галочку, но если он всего лишь на 24% умнее собаки - крестик.""",
             tts=True,
         )
         await message.add_reaction("✅")
@@ -199,29 +197,39 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             return
 
 
-async def play_music(voice_channel: discord.VoiceChannel):
-    def get_files_in_directory(directory_path):
-        file_list = []
-        for filename in os.listdir(directory_path):
-            file_path = os.path.join(directory_path, filename)
-            if os.path.isfile(file_path):
-                file_list.append(filename)
-        return file_list
+async def play_music(
+    voice_channel: discord.VoiceChannel, list_file_path: str = "list.txt"
+):
+    def get_urls_from_file(file_path):
+        with open(file_path, "r") as file:
+            urls = [url.strip() for url in file.readlines() if url.strip()]
+        return urls
 
     voice_client = await voice_channel.connect()
+
     try:
-        while voice_client.is_connected:
-            music = get_files_in_directory("music")
-            random.shuffle(music)
-            await voice_client.play(
+        urls = get_urls_from_file(list_file_path)
+        random.shuffle(urls)
+        for url in urls:
+            voice_client.play(
                 discord.PCMVolumeTransformer(
-                    discord.FFmpegPCMAudio("music/" + music[-1]), volume=0.1
-                ),
-                after=lambda e: voice_client.disconnect(),
+                    discord.FFmpegPCMAudio(
+                        url,
+                        before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+                    ),
+                    volume=0.5,
+                )
             )
+            while voice_client.is_playing():
+                await asyncio.sleep(1)
+                if not voice_client.is_connected():
+                    break
+
     except Exception as e:
         print(e)
-    # await voice_client.disconnect()
+
+    finally:
+        await voice_client.disconnect()
 
 
 @client.event
@@ -243,13 +251,25 @@ async def on_voice_state_update(
                     count += 1
             if count <= 1:
                 try:
-                    if member.guild.id != config.server_HG or "Основа" in voice_channel.name or "Кураторка" in voice_channel.name:
+                    if (
+                        member.guild.id != config.server_HG
+                        or "Основа" in voice_channel.name
+                        or "Кураторка" in voice_channel.name
+                    ):
                         return await play_music(voice_channel)
                 except discord.errors.ClientException:
                     print("Бот уже находится в голосовом канале.")
             else:
                 return await voice_client.disconnect()
 
+@tree_commands.command(
+    name="join_in_channel",
+    description="Подключается к голосовому каналу и играет музыку",
+)
+async def join_in_channel(interaction: discord.Interaction, channel: discord.VoiceChannel):
+    await interaction.response.defer(ephemeral=True)
+    await play_music(channel)
+    return await interaction.followup.send("Успешно")
 
 @timed_lru_cache(300)
 def get_guild(id: int) -> discord.Guild:
