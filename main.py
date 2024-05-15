@@ -52,6 +52,7 @@ client = discord.Client(
 )
 tree_commands = app_commands.CommandTree(client)
 
+
 def timed_lru_cache(seconds: int, maxsize: int = 128):
     def wrapper_cache(func):
         func = lru_cache(maxsize=maxsize)(func)
@@ -133,7 +134,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         channel = client.get_channel(config.channel_alert)
         message = await channel.send(
             (
-                f"""@here <@&{config.role_curator}>"""
+                f"""@here <@&{config.role_curator}> """
                 if user.id != 1129473387220176968
                 else ""
             )
@@ -198,15 +199,19 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
 
 
 async def play_music(
-    voice_channel: discord.VoiceChannel, list_file_path: str = "list.txt"
+    voice_channel: discord.VoiceChannel, special: bool, list_file_path: str = "list.txt"
 ):
     def get_urls_from_file(file_path):
         with open(file_path, "r") as file:
             urls = [url.strip() for url in file.readlines() if url.strip()]
         return urls
 
+    if client.voice_clients:
+        for voice_client in client.voice_clients:
+            if voice_client.channel == voice_channel:
+                # Если бот уже в голосовом канале на этом сервере, выходим из него
+                await voice_client.disconnect()
     voice_client = await voice_channel.connect()
-
     try:
         urls = get_urls_from_file(list_file_path)
         random.shuffle(urls)
@@ -222,12 +227,14 @@ async def play_music(
             )
             while voice_client.is_playing():
                 await asyncio.sleep(1)
-                if not voice_client.is_connected():
+                if (
+                    not voice_client.is_connected()
+                    or (not special and len(voice_channel.members) > 2)
+                    or len(voice_channel.members) < 2
+                ):
                     break
-
     except Exception as e:
         print(e)
-
     finally:
         await voice_client.disconnect()
 
@@ -238,12 +245,6 @@ async def on_voice_state_update(
 ):
     if before.channel != after.channel:
         voice_channel = after.channel
-        if client.voice_clients:
-            for voice_client in client.voice_clients:
-                if voice_client.guild == member.guild:
-                    if voice_client.channel == before.channel:
-                        # Если бот уже в голосовом канале на этом сервере, выходим из него
-                        await voice_client.disconnect()
         if voice_channel is not None:
             count = 0
             for user in after.channel.members:
@@ -256,20 +257,24 @@ async def on_voice_state_update(
                         or "Основа" in voice_channel.name
                         or "Кураторка" in voice_channel.name
                     ):
-                        return await play_music(voice_channel)
-                except discord.errors.ClientException:
-                    print("Бот уже находится в голосовом канале.")
-            else:
-                return await voice_client.disconnect()
+                        return await play_music(voice_channel, False)
+                except discord.errors.ClientException as e:
+                    print("Бот уже находится в голосовом канале: " + e)
+            # else:
+            # return await voice_client.disconnect()
+
 
 @tree_commands.command(
     name="join_in_channel",
     description="Подключается к голосовому каналу и играет музыку",
 )
-async def join_in_channel(interaction: discord.Interaction, channel: discord.VoiceChannel):
+async def join_in_channel(
+    interaction: discord.Interaction, channel: discord.VoiceChannel
+):
     await interaction.response.defer(ephemeral=True)
-    await play_music(channel)
+    await play_music(channel, True)
     return await interaction.followup.send("Успешно")
+
 
 @timed_lru_cache(300)
 def get_guild(id: int) -> discord.Guild:
