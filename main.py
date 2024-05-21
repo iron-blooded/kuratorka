@@ -208,8 +208,7 @@ async def play_music(
 
     if client.voice_clients:
         for voice_client in client.voice_clients:
-            if voice_client.channel == voice_channel:
-                # Если бот уже в голосовом канале на этом сервере, выходим из него
+            if voice_client.channel.guild is voice_channel.guild:
                 await voice_client.disconnect()
     voice_client = await voice_channel.connect()
     try:
@@ -219,10 +218,10 @@ async def play_music(
             voice_client.play(
                 discord.PCMVolumeTransformer(
                     discord.FFmpegPCMAudio(
-                        url,
+                        "https://5.restream.one/1465_1",
                         before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
                     ),
-                    volume=0.5,
+                    volume=0.2,
                 )
             )
             while voice_client.is_playing():
@@ -236,7 +235,7 @@ async def play_music(
     except Exception as e:
         print(e)
     finally:
-        await voice_client.disconnect()
+        await voice_client.disconnect(force=True)
 
 
 @client.event
