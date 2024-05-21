@@ -220,8 +220,9 @@ async def play_music(
                     discord.FFmpegPCMAudio(
                         "https://5.restream.one/1465_1",
                         before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+                        options="-af 'volume=0.1'"
                     ),
-                    volume=0.2,
+                    volume=0.1
                 )
             )
             while voice_client.is_playing():
