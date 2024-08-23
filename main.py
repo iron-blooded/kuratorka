@@ -81,6 +81,10 @@ async def vereficate_and_kick(member: discord.Member):
         get_role(config.server_HG, config.role_unvereficate),
         reason="Bерефицирован в кураторке",
     )
+    await member.edit(
+        nick=get_guild(config.server_kuratorka).get_member(member.id).display_name,
+        reason="Bерефицирован в кураторке",
+    )
     await get_guild(config.server_kuratorka).kick(
         member, reason="Прошел кураторку и зашел на сервер ХГ"
     )
@@ -220,9 +224,9 @@ async def play_music(
                     discord.FFmpegPCMAudio(
                         "https://5.restream.one/1465_1",
                         before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-                        options="-af 'volume=0.1'"
+                        options="-af 'volume=0.1'",
                     ),
-                    volume=0.1
+                    volume=0.1,
                 )
             )
             while voice_client.is_playing():
