@@ -52,6 +52,8 @@ client = discord.Client(
 )
 tree_commands = app_commands.CommandTree(client)
 
+requested_curator: set = set()  # Список id юзеров, что запросили кураторку. Что бы не спамили
+
 
 def timed_lru_cache(seconds: int, maxsize: int = 128):
     def wrapper_cache(func):
@@ -72,6 +74,8 @@ def timed_lru_cache(seconds: int, maxsize: int = 128):
 
 
 async def vereficate_and_kick(member: discord.Member):
+    global requested_curator
+    requested_curator.remove(member.id)
     member = get_guild(config.server_HG).get_member(member.id)
     await member.add_roles(
         get_role(config.server_HG, config.role_participant),
@@ -120,6 +124,7 @@ async def on_message(message: discord.Message):
 
 @client.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    global requested_curator
     user = payload.member
     if user.id == client.user.id:
         return
@@ -135,6 +140,8 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
             reason="Запросил кураторку",
         )
         await message_reacted.remove_reaction(payload.emoji, user)
+        if user.id in requested_curator:
+            return  # Что бы не было повторок в уведомлениях
         channel = client.get_channel(config.channel_alert)
         message = await channel.send(
             (
@@ -147,6 +154,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         )
         await message.add_reaction("✅")
         await message.add_reaction("❌")
+        requested_curator.add(user.id)
         return
     if (
         payload.channel_id == config.channel_alert
@@ -177,6 +185,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
                 user_wait_kuratorka,
                 reason=f"Претензии к прохождению кураторки от {user.id}.",
             )
+        requested_curator.remove(user_wait_kuratorka.id)
         await message_reacted.clear_reactions()
         return
     if (
