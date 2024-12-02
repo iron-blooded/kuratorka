@@ -47,9 +47,12 @@ discord_token = os.environ["inviteHG_discord_token"]
 intents = discord.Intents.default()
 intents.members = True
 intents.reactions = True
-client = discord.Client(
-    intents=intents,
-)
+if "proxy_http" in os.environ:
+    client = discord.Client(intents=intents, proxy=os.environ["proxy_http"])
+else:
+    client = discord.Client(
+        intents=intents,
+    )
 tree_commands = app_commands.CommandTree(client)
 
 requested_curator: set = set()  # Список id юзеров, что запросили кураторку. Что бы не спамили
@@ -256,6 +259,8 @@ async def play_music(
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
+    if "proxy_http" in os.environ:
+        return
     if before.channel != after.channel:
         voice_channel = after.channel
         if voice_channel is not None:
