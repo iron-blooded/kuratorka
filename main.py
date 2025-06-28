@@ -20,24 +20,26 @@ from time import sleep
 class config:
     server_kuratorka = 1217209541197041714
     """id сервера кураторки"""
-    message_reacting = 1217209789646377142
+    message_reacting = 1311010717700456468
     """id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки"""
-    channel_alert = 1217209541708611659
+    channel_alert = 1311008897988952074
     """id канала, в которое бот будет срать оповещениями"""
     server_HG = 612339223294640128
     """id сервера HG"""
-    role_wait_kurator = 1217209541197041715
+    role_wait_kurator = 1385299820582801499
     """роль ожидание кураторки"""
-    role_vereficate = 1217209541197041716
+    role_vereficate = 1385300015261552791
     """роль верефицирован"""
     role_participant = 612341683014598656
     """роль участник на ХГ"""
     role_unvereficate = 1050035683848364064
     """роль неверефицирован на ХГ"""
-    channel_writing_anketa = 1217209541708611661
+    channel_writing_anketa = 1353112568595742740
     """канал с написанием анкет"""
     role_curator = 1217209541197041717
     """роль куратор"""
+    role_confirm_ticket = 1385298742701199422
+    """роль о одобрении тикета"""
 
     def __init__(self) -> None:
         pass
@@ -55,7 +57,9 @@ else:
     )
 tree_commands = app_commands.CommandTree(client)
 
-requested_curator: set = set()  # Список id юзеров, что запросили кураторку. Что бы не спамили
+requested_curator: set = (
+    set()
+)  # Список id юзеров, что запросили кураторку. Что бы не спамили
 
 
 def timed_lru_cache(seconds: int, maxsize: int = 128):
@@ -119,7 +123,10 @@ async def on_member_join(member: discord.Member):
 
 @client.event
 async def on_message(message: discord.Message):
-    if message.channel.id == config.channel_writing_anketa:
+    if (
+        message.channel.id == config.channel_writing_anketa
+        and message.author.id != config.role_curator
+    ):
         await message.add_reaction("✅")
         await message.add_reaction("❌")
         return
@@ -145,8 +152,8 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         await message_reacted.remove_reaction(payload.emoji, user)
         if user.id in requested_curator:
             return  # Что бы не было повторок в уведомлениях
-        channel = client.get_channel(config.channel_alert)
-        message = await channel.send(
+        channel_alert = client.get_channel(config.channel_alert)
+        message = await channel_alert.send(
             (
                 f"""@here <@&{config.role_curator}> """
                 if user.id != 1129473387220176968
@@ -197,19 +204,34 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         if not user.roles or config.role_curator not in [i.id for i in user.roles]:
             await message_reacted.remove_reaction(payload.emoji, user)
             return
-        if emoji.name == "✅":
-            channel = client.get_channel(config.channel_alert)
-            message = await channel.send(
-                f"""✅ Пользователь <@{message_reacted.author.id}> успешно прошел кураторку написав анкету.\nПодтвердил: <@{user.id}>""",
-                tts=True,
+        channel_alert = client.get_channel(config.channel_alert)
+        if emoji.name == "❌":
+            await message_reacted.remove_reaction("✅", client.user)
+        elif emoji.name == "✅":  # одобрение тикета
+            message = await channel_alert.send(
+                f"""✅ <@{user.id}> по результатам анкеты подтвердил адекватность пользователя <@{message_reacted.author.id}>\nПосле проведения Кураторки вы можете подтвердить ее успех, нажав реакцию 🎉 в канале https://discord.com/channels/{config.server_kuratorka}/{config.channel_writing_anketa}/{message_reacted.id}""",
+            )
+            await message_reacted.author.add_roles(
+                get_role(config.server_kuratorka, config.role_confirm_ticket),
+                reason="Анкета принята",
+            )
+            await message_reacted.clear_reactions()
+            await message_reacted.add_reaction("🎉")
+        elif emoji.name == "🎉":  # завершение кураторки
+            message = await channel_alert.send(
+                f"""🎉 Пользователь <@{message_reacted.author.id}> успешно прошел кураторку на основе анкеты.\nПодтвердил: <@{user.id}>""",
             )
             await message_reacted.author.remove_roles(
                 get_role(config.server_kuratorka, config.role_wait_kurator),
-                reason="Анкета принята",
+                reason="Кураторка на основе анкеты проведена проведена",
+            )
+            await message_reacted.author.remove_roles(
+                get_role(config.server_kuratorka, config.role_confirm_ticket),
+                reason="Кураторка на основе анкеты проведена проведена",
             )
             await message_reacted.author.add_roles(
                 get_role(config.server_kuratorka, config.role_vereficate),
-                reason="Анкета принята",
+                reason="Кураторка на основе анкеты проведена проведена",
             )
             return
 
@@ -255,7 +277,7 @@ async def play_music(
         await voice_client.disconnect(force=True)
 
 
-@client.event
+# @client.event
 async def on_voice_state_update(
     member: discord.Member, before: discord.VoiceState, after: discord.VoiceState
 ):
