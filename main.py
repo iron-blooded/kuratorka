@@ -11,10 +11,12 @@ from async_lru import alru_cache  # type: ignore
 from functools import lru_cache, wraps
 from datetime import timedelta
 import discord
-from discord import app_commands
+from discord import app_commands, HTTPException, Forbidden
+from discord.utils import utcnow
 from discord.ext import commands
 from discord.ext.commands import has_permissions, MissingPermissions
 from time import sleep
+from typing import List
 
 
 class config:
@@ -24,6 +26,8 @@ class config:
     """id сообщения, под которое люди должны поставить реакцию якобы для прохождения кураторки"""
     channel_alert = 1311008897988952074
     """id канала, в которое бот будет срать оповещениями"""
+    channel_message_for_kick_player_unactive = 1388395839868764260
+    """id канала, из которого будет браться сообщение для кикнутого за неактив пользователя"""
     server_HG = 612339223294640128
     """id сервера HG"""
     role_wait_kurator = 1385299820582801499
@@ -49,6 +53,8 @@ discord_token = os.environ["inviteHG_discord_token"]
 intents = discord.Intents.default()
 intents.members = True
 intents.reactions = True
+# intents.messages = True # Включить при необходимости
+# intents.message_content = True
 if "proxy_http" in os.environ:
     client = discord.Client(intents=intents, proxy=os.environ["proxy_http"])
 else:
@@ -102,12 +108,90 @@ async def vereficate_and_kick(member: discord.Member):
     return
 
 
+async def send_dm(
+    user: discord.User | discord.Member,
+    content: str,
+    files: List[discord.message.Attachment] = None,
+    retry: int = 3,
+    backoff: float = 1.0,
+) -> bool:
+    """
+    Отправляет пользователю личное сообщение.
+
+    Параметры:
+      user: объект discord.User или discord.Member
+      content: текст сообщения
+      retry: сколько раз повторить при ошибке 5xx
+      backoff: начальная задержка между повторными попытками (секунд)
+
+    Возвращает:
+      True, если сообщение успешно отправлено; False в остальных случаях.
+    """
+    if files == None:
+        files = []
+    try:
+        # создаём DM-канал (если он ещё не существует)
+        dm_channel = await user.create_dm()
+        await dm_channel.send(content, files=files)
+        return True
+
+    except Forbidden:
+        # 403 — пользователь закрыл личку
+        print(f"❌ Нельзя отправить DM пользователю {user!r}: доступ запрещён.")
+        return False
+
+    except HTTPException as e:
+        # 5xx или rate-limit
+        if 500 <= e.status < 600 and retry > 0:
+            # exponential backoff
+            await asyncio.sleep(backoff)
+            return await send_dm(user, content, retry - 1, backoff * 2)
+        print(f"❌ Не удалось отправить DM пользователю {user!r}: {e}")
+        return False
+
+    except Exception as e:
+        # неожиданная ошибка
+        print(f"❌ Ошибка при отправке DM: {e}")
+        return False
+
+
+async def kick_all_afk_members():
+    channel = client.get_channel(config.channel_message_for_kick_player_unactive)
+    message = "**Ты был исключен с проходки HG (Minecraft RP Политический Сервер) за неактив.** \nДля прохождения авторизации необходимо зайти обратно на сервер. \nАктуальная ссылка: {{link}}"
+    processed_files = []
+    async for mess in channel.history(limit=10):
+        if len(mess.content) > 10:
+            message = message.content
+        processed_files = mess.attachments
+        break
+    invite_link = ""
+    for invite in await get_guild(config.server_kuratorka).invites():
+        if invite.max_age == 0 and invite.max_uses == 0:
+            invite_link = invite.url
+            break
+    message = message.replace("{{link}}", invite_link)
+    for member in client.get_guild(config.server_kuratorka).members:
+        if (
+            member.joined_at < (utcnow() - timedelta(days=5))
+            and not member.bot
+            and (
+                len(member.roles) <= 1  # потому что еще есть @everyone
+                or max(i.id == config.role_wait_kurator for i in member.roles)
+            )
+        ):
+            print(f"За неактив кикнут: {member.name}")
+            await send_dm(user=member, files=processed_files, content=message)
+            await member.kick(reason="Дольше 5 дней сидит афк")
+            await asyncio.sleep(1)
+
 @client.event
 async def on_ready():
+    print("Начало")
     await tree_commands.sync()
     await client.wait_until_ready()
     print("Бот запущен!")
     while not client.is_closed():
+        asyncio.create_task(kick_all_afk_members())
         await asyncio.sleep(60 * 5)  # раз в # минут
 
 
