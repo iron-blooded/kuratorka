@@ -17,6 +17,7 @@ from discord.ext import commands
 from discord.ext.commands import has_permissions, MissingPermissions
 from time import sleep
 from typing import List
+import logging
 
 
 class config:
@@ -48,6 +49,41 @@ class config:
     def __init__(self) -> None:
         pass
 
+
+class CustomFormatter(logging.Formatter):
+    """Кастомный форматтер для цветного вывода логов."""
+
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format = (
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+    )
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset,
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno, self.format)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
+# Создаём логгер
+logger = logging.getLogger("kuratorka")
+logger.setLevel(getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO))
+
+# Создаём StreamHandler и задаём кастомный форматтер
+ch = logging.StreamHandler()
+ch.setFormatter(CustomFormatter())
+logger.addHandler(ch)
 
 discord_token = os.environ["inviteHG_discord_token"]
 intents = discord.Intents.default()
@@ -137,7 +173,7 @@ async def send_dm(
 
     except Forbidden:
         # 403 — пользователь закрыл личку
-        print(f"❌ Нельзя отправить DM пользователю {user!r}: доступ запрещён.")
+        logger.warning(f"❌ Нельзя отправить DM пользователю {user!r}: доступ запрещён.")
         return False
 
     except HTTPException as e:
@@ -146,12 +182,12 @@ async def send_dm(
             # exponential backoff
             await asyncio.sleep(backoff)
             return await send_dm(user, content, retry - 1, backoff * 2)
-        print(f"❌ Не удалось отправить DM пользователю {user!r}: {e}")
+        logger.error(f"❌ Не удалось отправить DM пользователю {user!r}: {e}")
         return False
 
     except Exception as e:
         # неожиданная ошибка
-        print(f"❌ Ошибка при отправке DM: {e}")
+        logger.error(f"❌ Ошибка при отправке DM: {e}")
         return False
 
 
@@ -179,17 +215,17 @@ async def kick_all_afk_members():
                 or max(i.id == config.role_wait_kurator for i in member.roles)
             )
         ):
-            print(f"За неактив кикнут: {member.name}")
+            logger.info(f"За неактив кикнут: {member.name}")
             await send_dm(user=member, files=processed_files, content=message)
             await member.kick(reason="Дольше 5 дней сидит афк")
             await asyncio.sleep(1)
 
 @client.event
 async def on_ready():
-    print("Начало")
+    logger.info("Начало")
     await tree_commands.sync()
     await client.wait_until_ready()
-    print("Бот запущен!")
+    logger.info("Бот запущен!")
     while not client.is_closed():
         asyncio.create_task(kick_all_afk_members())
         await asyncio.sleep(60 * 5)  # раз в # минут
@@ -209,7 +245,7 @@ async def on_member_join(member: discord.Member):
 async def on_message(message: discord.Message):
     if (
         message.channel.id == config.channel_writing_anketa
-        and message.author.id != config.role_curator
+        and config.role_curator not in [i.id for i in message.author.roles]
     ):
         await message.add_reaction("✅")
         await message.add_reaction("❌")
@@ -356,7 +392,7 @@ async def play_music(
                 ):
                     break
     except Exception as e:
-        print(e)
+        logger.warning(e)
     finally:
         await voice_client.disconnect(force=True)
 
@@ -383,7 +419,7 @@ async def on_voice_state_update(
                     ):
                         return await play_music(voice_channel, False)
                 except discord.errors.ClientException as e:
-                    print(f"Бот уже находится в голосовом канале: {e}")
+                    logger.info(f"Бот уже находится в голосовом канале: {e}")
             # else:
             # return await voice_client.disconnect()
 
